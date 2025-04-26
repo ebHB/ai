@@ -47,10 +47,48 @@ class Block:
         self.x += dx
         self.y += dy
 
+    def rotate(self):
+        # ブロックを回転させる（90度時計回り）
+        self.shape = [list(row) for row in zip(*self.shape[::-1])]
+
+class GameBoard:
+    def __init__(self):
+        self.width = SCREEN_WIDTH // 30
+        self.height = SCREEN_HEIGHT // 30
+        self.grid = [[0 for _ in range(self.width)] for _ in range(self.height)]
+
+    def add_block_to_grid(self, block):
+        for row_index, row in enumerate(block.shape):
+            for col_index, cell in enumerate(row):
+                if cell:
+                    grid_y = block.y + row_index
+                    grid_x = block.x + col_index
+                    if 0 <= grid_y < self.height and 0 <= grid_x < self.width:
+                        self.grid[grid_y][grid_x] = 1
+
+    def clear_lines(self):
+        new_grid = [row for row in self.grid if any(cell == 0 for cell in row)]
+        lines_cleared = self.height - len(new_grid)
+        for _ in range(lines_cleared):
+            new_grid.insert(0, [0 for _ in range(self.width)])
+        self.grid = new_grid
+        return lines_cleared
+
+    def draw(self, surface):
+        for y, row in enumerate(self.grid):
+            for x, cell in enumerate(row):
+                if cell:
+                    pygame.draw.rect(
+                        surface,
+                        WHITE,
+                        pygame.Rect(x * 30, y * 30, 30, 30)
+                    )
+
 # ゲームループ
 def main():
     clock = pygame.time.Clock()
     running = True
+    game_board = GameBoard()
     current_block = Block()
 
     while running:
@@ -64,9 +102,31 @@ def main():
                     current_block.move(1, 0)
                 elif event.key == pygame.K_DOWN:
                     current_block.move(0, 1)
+                elif event.key == pygame.K_UP:
+                    current_block.rotate()
+
+        # ブロックが下に到達した場合
+        reached_bottom = False
+        for row_index, row in enumerate(current_block.shape):
+            for col_index, cell in enumerate(row):
+                if cell:
+                    grid_y = current_block.y + row_index + 1
+                    grid_x = current_block.x + col_index
+                    if grid_y >= game_board.height or \
+                       (0 <= grid_y < game_board.height and 0 <= grid_x < game_board.width and game_board.grid[grid_y][grid_x] == 1):
+                        reached_bottom = True
+                        break
+            if reached_bottom:
+                break
+        if reached_bottom:
+            game_board.add_block_to_grid(current_block)
+            lines_cleared = game_board.clear_lines()
+            print(f"Lines cleared: {lines_cleared}")
+            current_block = Block()
 
         # 背景色を設定
         screen.fill(BLACK)
+        game_board.draw(screen)
         current_block.draw(screen)
 
         pygame.display.flip()
